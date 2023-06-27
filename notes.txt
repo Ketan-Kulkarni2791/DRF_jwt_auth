@@ -1,0 +1,170 @@
+-- Create an empty folder and open it in VS code.
+-- Create virtual environment :
+    > virtualenv authenv
+-- Activate the virtaul env :
+    > authenv\Scripts\activate
+-- Install django :
+    > pip install django
+-- Create a new django project :
+    > django-admin startproject drf_jwt_auth
+-- Then get inside the project directory to create new app and add it (acount) to settings.py installed app :
+    > cd drf_jwt_auth
+    > python manage.py startapp account
+-- Then install django rest framework and add it (rest_framework) to settings.py installed app.
+    > pip install djangorestframework
+-- Then install Simple JWT and add ''rest_framework_simplejwt'' to installed apps:
+    > pip install djangorestframework-simplejwt
+-- Then add following code block in settings.py file :
+    >> REST_FRAMEWORK = {
+            'DEFAULT_AUTHENTICATION_CLASSES': (
+                'rest_framework_simplejwt.authentication.JWTAuthentication',
+            )
+        }
+-- Then add following code block to settings.py :
+    >> from datetime import timedelta
+       SIMPLE_JWT = {
+            "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+            "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+            "ROTATE_REFRESH_TOKENS": False,
+            "BLACKLIST_AFTER_ROTATION": False,
+            "UPDATE_LAST_LOGIN": False,
+
+            "AUTH_HEADER_TYPES": ("Bearer",),
+            "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+            "USER_ID_FIELD": "id",
+            "USER_ID_CLAIM": "user_id",
+            "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
+
+            "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+            "TOKEN_TYPE_CLAIM": "token_type",
+            "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
+
+            "JTI_CLAIM": "jti",
+        }
+-- Then to avoid CORS error while connected with front-end, install following and add 'corsheaders' to installed apps :
+    > pip install django-cors-headers
+-- Then add 'corsheaders.middleware.CorsMiddleware' above 'CommonMiddleware'.
+-- Then add allowed hosts for cors token in settings.py :
+    >> CORS_ALLOWED_ORIGINS = [
+            "http://localhost:8080",
+            "http://127.0.0.1:3000",
+        ]
+
+-- Then let's create model.
+   Reference doc link : https://docs.djangoproject.com/en/4.2/topics/auth/customizing/#a-full-example
+   Import following :
+    >> from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
+
+    Then create User model :
+    >> class User(AbstractBaseUser):
+            email = models.EmailField(
+                verbose_name="Email",
+                max_length=255,
+                unique=True,
+            )
+            name = models.CharField(max_length=255)
+            tc = models.BooleanField()
+            is_active = models.BooleanField(default=True)
+            is_admin = models.BooleanField(default=False)
+            created_at = models.DateTimeField(auto_now_add=True)
+            updated_at = models.DateTimeField(auto_now=True)
+
+            objects = MyUserManager()
+
+            USERNAME_FIELD = "email"
+            REQUIRED_FIELDS = ["name", "tc"]
+
+            def __str__(self):
+                return self.email
+
+            def has_perm(self, perm, obj=None):
+                "Does the user have a specific permission?"
+                # Simplest possible answer: Yes, always
+                return self.is_admin
+
+            def has_module_perms(self, app_label):
+                "Does the user have permissions to view the app `app_label`?"
+                # Simplest possible answer: Yes, always
+                return True
+
+            @property
+            def is_staff(self):
+                "Is the user a member of staff?"
+                # Simplest possible answer: All admins are staff
+                return self.is_admin
+
+-- Then before custom user model, add custom user manager model as follows :
+    >> # Custom User Manager Model
+        class UserManager(BaseUserManager):
+            def create_user(self, email, name, tc, password=None, password2=None):
+                """
+                Creates and saves a User with the given email, name, tc and password.
+                """
+                if not email:
+                    raise ValueError("User must have an email address")
+
+                user = self.model(
+                    email=self.normalize_email(email),
+                    name=name,
+                    tc=tc
+                )
+
+                user.set_password(password)
+                user.save(using=self._db)
+                return user
+
+            def create_superuser(self, email, name, tc, password=None):
+                """
+                Creates and saves a superuser with the given email, name, tc, and password.
+                """
+                user = self.create_user(
+                    email,
+                    password=password,
+                    name=name,
+                    tc=tc
+                )
+                user.is_admin = True
+                user.save(using=self._db)
+                return user
+
+-- Then in order to see tables created in sqlite3 db, add extension 'sqlite3 viewer' to VS Code.
+-- Then in settings.py, add following line in order to make our User model as default for creating superuser:
+    >> AUTH_USER_MODEL = 'account.User'
+-- Then makemigrations.
+-- Then create superuser and then login and check :
+    >> python manage.py createsuperuser
+
+-- Then, to register this custom user model with Django’s admin, the following code would be required in 
+   the app’s admin.py file:
+   >>   from account.models import User
+        from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+
+        class UserModelAdmin(BaseUserAdmin):
+
+            # The fields to be used in displaying the User model.
+            # These override the definitions on the base UserModelAdmin
+            # that reference specific fields on auth.User.
+            list_display = ["id", "email", "name", "tc", "is_admin"]
+            list_filter = ["is_admin"]
+            fieldsets = [
+                ("User Credentials", {"fields": ["email", "password"]}),
+                ("Personal info", {"fields": ["name", "tc"]}),
+                ("Permissions", {"fields": ["is_admin"]}),
+            ]
+            # add_fieldsets is not a standard ModelAdmin attribute. UserModelAdmin
+            # overrides get_fieldsets to use this attribute when creating a user.
+            add_fieldsets = [
+                (
+                    None,
+                    {
+                        "classes": ["wide"],
+                        "fields": ["email", "name", "tc", "password1", "password2"],
+                    },
+                ),
+            ]
+            search_fields = ["email"]
+            ordering = ["email", "id"]
+            filter_horizontal = []
+
+        # Now register the new UserModelAdmin...
+        admin.site.register(User, UserModelAdmin)
