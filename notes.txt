@@ -168,3 +168,129 @@
 
         # Now register the new UserModelAdmin...
         admin.site.register(User, UserModelAdmin)
+
+-- Then create serializers.py and urls.py files in account app. And include the path in project's 
+   urls.py file :
+   >> path('api/user/', include('account.urls'))
+
+-- Then let's go to view to create User Registration class. Import following stuff first :
+    >>  from rest_framework.response import Response
+        from rest_framework import status
+        from rest_framework.views import APIView
+    Then  create a basic post method using APIView and it to the urls.py file.
+    >> class UserRegistrationView(APIView):
+        def post(self, request, format=None):
+            return Response(
+                {
+                    "Message": "Registration Successful !"
+                }
+            )
+-- Add following code to account app's urls.py file and check in the browser if api/user/register/ works:
+    >>  from .views import UserRegistrationView
+
+        urlpatterns = [
+            path('register/', UserRegistrationView.as_view(), name='register')
+        ]
+-- If you want to remove other stuff from browser and only want json response of the api to be shown,
+   you can add following code in settings.py file's REST_FRAMEWORK section (Just FYI, no need to add.) :
+   >> 'DEFAULT_RENDERER_CLASSES' : ('rest_framework.renderers.JSONRenderer',)
+
+-- Then test this post api in postman.
+-- Now let's create serializer.
+-- If you are not getting proper intelliscence, go to command pallete by clicking ctrl+shift+p, select 
+   Python interpreter, and select authenv one.
+-- Add following code in serializer.py :
+    >>  from rest_framework import serializers
+        from .views import UserRegistrationView
+        from .models import User
+
+
+        class UserRegistrationSerializer(serializers.ModelSerializer):
+            # This is because we need confirm password filed in our registration request
+            password2 = serializers.CharField(style={'input_type': 'password'}, write_only=True)
+            class Meta:
+                model=User
+                fields=['email', 'name', 'passowrd', 'password2', 'tc']
+                extra_kwargs = {
+                    'password': {'write_only': True}
+                }
+
+-- Now from postman, we will recieve data through 'request' parameter in the UserRegistrationView. And
+   we will send that data to UserRegistrationSerializer for the serializing purpose.
+   >> serializer = UserRegistrationSerializer(data=request.data)   # In views.py
+-- Now let's validate this data into serializer :
+    >>  # Validating password and confirm password while registration
+        def validate(self, attrs):
+            password = attrs.get('password')
+            password2 = attrs.get('password2')
+            if password != password2:
+                raise serializers.ValidationError("Passwords does not match !")
+            return attrs
+
+-- Now since we have custom user model, we have to add create method for creating user in the serializer class.
+    >> def create(self, validated_data):
+        return User.objects.create_user(**validated_data)
+
+-- Now let's call this validation mechanism in our views.py.
+    >> if serializer.is_valid(raise_exception=True):
+        user = serializer.save()
+        return Response(
+            {"Message": "Registration Successful !"},
+            status=status.HTTP_201_CREATED
+        )
+
+-- Then let's go to postman to check the post api.
+-- In Headers, add key = Accept and Value = application/json.
+-- Then select Body --> Raw --> JSON.
+-- Give the data into body and hit send.
+    >> {
+            "email": "indu@example.com",
+            "name": "Indu Singh",
+            "password": "indu@123#",
+            "password2": "indu@123#",
+            "tc": "True"
+        }
+-- Check if the data is saved in db table.
+-- Here Registration part is completed.
+
+***************************** Login View and Stuff ******************************************
+
+-- Go to views.py and create a basic UserLoginView.
+    >> class UserLoginView(APIView):
+        def post(self, request, format=None):
+            return Response(
+                    {"Message": "Login Successful !"},
+                    status=status.HTTP_200_OK
+                )
+-- Then go to serializers.py and create a serializer for UserLoginView.
+    >> class UserLoginSerializer(serializers.ModelSerializer):
+        email = serializers.EmailField(max_length=255)
+        class Meta:
+            model=User
+            fields=['email', 'password']
+-- Now we have to authenticate the user. We will take our serialized data into view and then
+   do the authentication stuff into views.py.
+   >> class UserLoginView(APIView):
+        def post(self, request, format=None):
+            serializer = UserLoginSerializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                email = serializer.data.get('email')
+                password = serializer.data.get('password')
+                user = authenticate(email=email, password=password)
+                if user is not None:
+                    return Response(
+                        {"Message": "Login Successful !"},
+                        status=status.HTTP_200_OK
+                    )
+                else:
+                    return Response(
+                        {"Errors": {"non_field_errors": ["Email or Password is not valid !"]}},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+-- Then following to app's urls.py :
+    >> path('login/', UserLoginView.as_view(), name='login'),
+
