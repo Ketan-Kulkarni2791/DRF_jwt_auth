@@ -293,4 +293,52 @@
             )
 -- Then following to app's urls.py :
     >> path('login/', UserLoginView.as_view(), name='login'),
+-- Test is in postman, see if login is succesfull :
+    >> {
+            "email": "indu@example.com",
+            "password": "indu@123#"
+       }
+
+
+************************************ Customize Error Response ************************************
+ 
+-- Create a new file called 'renderers.py' in account app.
+-- Add following code to it :
+    >>  from rest_framework import renderers
+        import json
+
+        class UserRenderer(renderers.JSONRenderer):
+            charset = 'UTF-8'
+            def render(self, data, accepted_media_type=None, renderer_context=None):
+                response = ''
+                if 'ErrorDetail' in str(data):
+                    response = json.dumps({"Errro": data})
+                else:
+                    response = json.dumps(data)
+                return response
+-- Then to use it, go to views.py and import this class there.
+    >> from .renderers import UserRenderer
+-- Then add following code to views :
+    >> renderer_classes = [UserRenderer]
+-- Then if you try to bring error in postman while hitting the api, you can see errors as follows
+   with "errors" key. This will help in frontend. :
+    >> {
+        "errors": {
+            "email": [
+                "This field is required."
+            ],
+            "name": [
+                "This field is required."
+            ],
+            "password": [
+                "This field is required."
+            ],
+            "password2": [
+                "This field is required."
+            ],
+            "tc": [
+                "This field is required."
+            ]
+        }
+    }
 
