@@ -342,3 +342,63 @@
         }
     }
 
+
+************************************ Creating tokens manually *************************************
+
+-- Refer folowing doc : https://django-rest-framework-simplejwt.readthedocs.io/en/latest/creating_tokens_manually.html
+-- Now let'a go to views.py and import the token lib.
+    >>  from rest_framework_simplejwt.tokens import RefreshToken
+        def get_tokens_for_user(user):
+        refresh = RefreshToken.for_user(user)
+
+        return {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }
+-- Then in Registration view, after the saving the user, call this above method and pass the saved user.
+    >> token = get_tokens_for_user(user)
+-- Then send this token in the response.
+    >> return Response(
+            {"token": token, "Message": "Registration Successful !"},
+            status=status.HTTP_201_CREATED
+        )
+-- Then do the similar thing in login view.
+-- Then test in the postman for both regiter and login api. Both refresh and access tokens must be
+   generated.
+
+********************************* Get User Profile View *****************************************
+
+-- Create a new view in views.py.
+-- Before that, create a serializer in serializers.py file.
+    >>  class UserProfileSerializer(serializers.ModelSerializer):
+        class Meta:
+            model=User
+            fields=['id', 'email', 'name']
+-- Then use it in the views.py. When we use "permission_classes = [IsAuthenticated]", we are making this
+   api a protected route for only authenticated users with token to access.
+        >>  from rest_framework.permissions import IsAuthenticated
+            class UserProfileView(APIView):
+                renderer_classes = [UserRenderer]
+                permission_classes = [IsAuthenticated]
+                def get(self, request, format=None):
+                    serializer = UserProfileSerializer(request.user)
+                    return Response(
+                        serializer.data,
+                        status=status.HTTP_200_OK
+                    )
+-- Then add url in urls.py :
+    >> path('profile/', UserProfileView.as_view(), name='profile'),
+-- Now if we try to hit the GET api, we will get following error :
+    >> {
+            "errors": {
+                "detail": "Authentication credentials were not provided."
+            }
+        }
+-- So hit login api and copy the generated access token.
+-- Then add the header : Authorization, and in value write Bearer and then give a space and paste 
+   the token for profile api.
+-- Then if we hit the api, it will return us that logged in user's data.
+
+*********************************** Change Password *********************************************
+
+
