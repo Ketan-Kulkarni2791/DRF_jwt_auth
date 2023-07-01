@@ -7,7 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from .serializers import (UserRegistrationSerializer, UserLoginSerializer, 
                           UserProfileSerializer, UserChangePasswordSerializer,
-                          SendUserPasswordResetEmailSerializer)
+                          SendUserPasswordResetEmailSerializer, UserPasswordResetSerializer)
 
 
 # Generating token manually
@@ -102,3 +102,19 @@ class SendUserPasswordResetEmailView(APIView):
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class UserPasswordResetView(APIView):
+    renderer_classes = [UserRenderer]
+    def post(self, request, uid, token, format=None):
+        serializer = UserPasswordResetSerializer(data=request.data,
+                                                 context={'uid': uid, 'token': token})
+        if serializer.is_valid(raise_exception=True):
+            return Response(
+                    {"Message": "Password reset Successful."},
+                    status=status.HTTP_200_OK
+                )
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )

@@ -399,6 +399,10 @@
    the token for profile api.
 -- Then if we hit the api, it will return us that logged in user's data.
 
-*********************************** Change Password *********************************************
+************************ To Export Postman Collection *********************************
+
+-- Click on the Collection in postman and select the option export.
+-- Save the .json file into project directory.
+-- Then you can delete that collection from the postman and import it bak again.
 
 
